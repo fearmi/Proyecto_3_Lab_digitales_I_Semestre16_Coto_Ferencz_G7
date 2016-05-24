@@ -1,0 +1,77 @@
+;programa para generar señales de control con picoblaze de display
+;se definen puertos de entrada y de salida
+;8 DIP switches de entrada
+CONSTANT Switch , 00
+;salida 7 Segmentos
+CONSTANT Seg, 01
+;
+namereg s0, data       ;reg for temporary data
+;
+load data, 00 ;se inicializa el registro temporal en 00
+
+start:
+	  input data,Switch ;recibe dato y lo guarda en registro temporal
+	  call dec_to_led ;asigna valor correspondiente a registro temporal
+	  output data,Seg ;asigna a seg valor de data
+	  jump start; salta al inicio
+
+
+
+;funcion que permite generar señales para controlar display
+dec_to_led:                 
+   compare data, 00         
+   jump nz, comp_hex_1    
+   load data, C0          ;7seg pattern 0 MSB es dp y LSB a
+   jump hex_done          
+comp_hex_1:                 
+   compare   data, 01         
+   jump nz, comp_hex_2    
+   load data, F9          ;7seg pattern 1
+   jump hex_done          
+comp_hex_2:                 
+   compare data, 02         
+   jump nz, comp_hex_3    
+   load data, A4          ;7seg pattern 2
+   jump hex_done          
+comp_hex_3:                 
+   compare data, 03         
+   jump nz, comp_hex_4    
+   load data, B0          ;7seg pattern 3
+   jump hex_done          
+comp_hex_4:                 
+   compare data, 04         
+   jump nz, comp_hex_5    
+   load data, 99          ;7seg pattern 4
+   jump hex_done          
+comp_hex_5:                 
+   compare data, 05         
+   jump nz, comp_hex_6    
+   load data, 92          ;7seg pattern 5
+   jump hex_done          
+comp_hex_6:                 
+   compare data, 06         
+   jump nz, comp_hex_7    
+   load data, 82          ;7seg pattern 6
+   jump hex_done          
+comp_hex_7:                 
+   compare data, 07         
+   jump nz, comp_hex_8    
+   load data, F8          ;7seg pattern 7
+   jump hex_done          
+comp_hex_8:                 
+   compare data, 08         
+   jump nz, comp_hex_9    
+   load data, 80          ;7seg pattern 8
+   jump hex_done          
+comp_hex_9:                 
+   compare data, 09         
+   jump nz, comp_hex_a    
+   load data, 90          ;7seg pattern 9
+   jump hex_done          
+comp_hex_a:                 
+   compare data, 0A         
+   jump nz, dec_to_led  
+   load data, 7F          ;7seg pattern a
+   jump hex_done           
+hex_done:
+   return
