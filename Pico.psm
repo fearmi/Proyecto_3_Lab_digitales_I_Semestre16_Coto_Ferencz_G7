@@ -1,0 +1,315 @@
+;rutina de inicializaciÃ³n rtc_vga
+;-----------------------------------------------------------------------------------------------
+;-------------------------------PUERTOS DE SALIDA-----------------------------------------------
+
+#equ DatoRTC,0x00 ;dato a RTC salida
+#equ AddRTC,0x01 ;Direccion a RTC salida
+#equ Dale,0x03;salida
+#equ Seg_R,0x04 ; salida segundos de hora
+#equ Min_R,0x05 ;salida minutos de hora
+#equ Hor_R,0x06 ; salida hora de hora
+#equ Dia_F,0x07 ;salida dia de fecha
+#equ Mes_F,0x08 ;salida mes de fecha
+#equ Year_F,0x09 ;salida año de fecha
+#equ Seg_T,0x0A ;salida segundos de cronometro
+#equ Min_T,0x0B ;salida minutos de cronometro
+#equ Hor_T,0x0C ;salida hora de cronometro
+#equ CM,0x0D
+;----------------------------------------------------------------------------------------------
+;-------------------------------PUERTOS DE ENTRADA---------------------------------------------
+#equ Iniciar,0x02 ; señal de entrada para iniciar
+#equ In_Data, 0x04; entrada de dato
+#equ Reset,0x05; Reset de PS2
+#equ PR, 0x06 ; Programar parametros de reloj F1
+#equ PF,0x07;Progrmar parametros de fecha F2
+#equ PT,0x08;Programar parametros de timer F3
+#equ OK,0x09;Enter 
+#equ Dato_In,0x0A
+;----------------------------------------------------------------------------------------------
+;ahora, se definen registros temporales
+#equ Delay,s0 ; se define registro para crear retardos
+#equ Data_out1,s1;direccion
+#equ Data_out2,s2;dato
+#equ Data_in,s3;dato de entrada
+#equ Data_out3,s4;manejo de reset y perifericos
+#equ Dato_SP,s7 ;dato leido de Scratch Pad Mem
+#equ MP,s8 ; registro temporal de direcciones de registros de lectura
+#equ Rst,s9
+#equ Reloj,sA
+#equ Fecha,sB
+#equ Timer,sC
+#equ Enter,sD
+#equ DataProg,sE
+;-----------------------------------------------------------------------------------------------
+;------------------------------------LOADS INICIALES--------------------------------------------
+;se carga cada uno de los registros temporales con valor 
+load Delay, 0x12 ; quiere decir 128 pulsos de 10 ns
+load Data_out1,0x00
+load Data_out2,0x00
+load Data_in,0x00
+load Data_out3,0x00
+load s5,0x00
+load Dato_SP,0x00
+;------------------------------------------------------------------------------------------------
+	
+inicio:
+	
+	rdPrt Data_in,Iniciar
+	comp Data_in,0x02
+	jump NZ, inicio
+	load Data_out3,0x38
+    wrPrt Data_out3,Dale
+	call Inicializacion
+	call start
+	
+start:
+	call Leer
+	call Control_VGA
+	rdPrt Data_in,Iniciar
+	comp Data_in,0x02
+	jump NZ, inicio
+	jump start 
+;funcion que permite generar seÃ±ales de salida basado en seÃ±ales de entrada.
+Inicializacion:
+	call RegInicia
+    call RegClock
+    call RegFecha
+    call RegTimer
+    load Data_out1,0xF0
+    load Data_out2,0xF0
+    call Write
+	ret	
+;-----------------------------------------------------------------------------------------
+;-----------------------------RETRASO-----------------------------------------------------	
+Retraso:        ;funcion para generar retrasos
+   sub Delay,0x01
+   jump NZ, Retraso
+   load Delay, 0x12
+   ret 
+;-----------------------------------------------------------------------------------------
+;---------------------------WRITE---------------------------------------------------------
+Write:
+   wrPrt Data_out1,AddRTC;direccion en puerto
+   wrPrt Data_out2,DatoRTC;dato en puerto
+   load Data_out3,0x11;carga dato para habilitar perifericos de escritura
+   wrPrt Data_out3,Dale; habilita ciclo de envio de señales de control
+   load Data_out3,0x18
+   call Retraso
+   wrPrt Data_out3,Dale
+   ret
+;------------------------------------------------------------------------------------------
+;-------------------------READ--------------------------------------------------------------
+Read:
+   wrPrt Data_out1,AddRTC ;pone en el puerto de salida dirección
+   load Data_out3,0x0E
+   wrPrt Data_out3, Dale ;habilita señales de control de RTC
+   wrPrt MP,CM
+   load Data_out3, 0x1C 
+   call Retraso ;realiza el retraso que permite leer el dato
+   wrPrt Data_out3, Dale ;habilita señales de control de RTC
+   ret
+ ;------------------------------------------------------------------------------------------
+ ;------------------------------LEER DATO DE REGISTRO---------------------------------------
+Read_Data:
+   wrPrt MP,CM
+   rdPrt s6,In_Data;lee puerto
+   wrmem s6,(s5);guarda dato en scratchpad 
+   add s5,0x01;actualiza la dirección de memoria
+   ret
+;-------------------------------------------------------------------------------------------
+;--------------------------COMANDOS DE LECTURA----------------------------------------------
+Read_Comand:
+   wrPrt Data_out1,AddRTC;direccion en puerto
+   wrPrt Data_out2,DatoRTC;dato en puerto
+   load Data_out3,0x0E;carga dato para habilitar perifericos de escritura
+   wrPrt Data_out3,Dale; habilita ciclo de envio de señales de control
+   load Data_out3,0x18
+   call Retraso
+   wrPrt Data_out3,Dale
+   ret
+;--------------------------------------------------------------------------------------------
+;----------------------------LEER------------------------------------------------------------
+Leer:
+	load Data_out1, 0xF0;
+	load Data_out2, 0xF0;
+	call Read_Comand
+	load Data_out1,0x21
+	load MP,0x02
+	call Read
+	load MP,0x00
+	call Read_Data
+	load Data_out1, 0x22
+	load MP,0x12
+	call Read
+	load MP,0x10
+	call Read_Data
+	load Data_out1,0x23
+	load MP,0x22
+	call Read
+	load MP,0x20
+	call Read_Data
+	load Data_out1,0x24
+	load MP,0x32
+	call Read
+	load MP,0x30
+	call Read_Data
+	load Data_out1,0x25
+	load MP,0x42
+	call Read
+	load MP,0x40
+	call Read_Data
+	load Data_out1,0x26
+	load MP,0x52
+	call Read
+	load MP,0x50
+	call Read_Data
+	load Data_out1,0x41
+	load MP,0x62
+	call Read
+	load MP,0x60
+	call Read_Data
+	load Data_out1,0x42
+	load MP,0x72
+	call Read
+	load MP,0x70
+	call Read_Data
+	load Data_out1,0x43
+	load MP,0x82
+	call Read
+	load MP,0x80
+	call Read_Data
+	load s5,0x00
+	ret
+;--------------------------------------------------------------------------------------------
+;-----------------PROGRAMAR PARAMETROS DE INICIALIZACION------------------------------------
+RegInicia:
+   load Data_out1,0x02 ;reg status 02
+   load Data_out2,0x10 ;bit de ini en alto
+   call Write 
+   load Data_out1,0x02;reg status 02
+   load Data_out2,0x00;bit de ini bajo
+   call Write
+   load Data_out1,0x10
+   load Data_out2,0xD2
+   call Write
+   load Data_out1,0x01
+   load Data_out2,0x00
+   call Write
+   load Data_out1,0x00
+   load Data_out2,0x00
+   call Write 
+   ret	
+;---------------------------------------------------------------------------------------------
+;-----------------------------PROGRAMAR PARAMETROS DE RELOJ----------------------------------
+RegClock:
+   load Data_out1,0x21
+   call Write
+   load Data_out1,0x22
+   call Write
+   load Data_out1,0x23
+   call Write 
+   ret	
+;--------------------------------------------------------------------------------------------
+;---------------------------PROGRAMAR PARAMETROS DE FECHA-----------------------------------
+RegFecha:
+   load Data_out1,0x24
+   call Write
+   load Data_out1,0x25
+   call Write
+   load Data_out1,0x26
+   call Write 
+   ret	
+;------------------------------------------------------------------------------------------
+;-----------------------------------PROGRAMAR PARAMETROS DE TIMER--------------------------
+RegTimer:
+   load Data_out1,0x41
+   wrPrt Data_out1,AddRTC
+   call Write
+   load Data_out1,0x42
+   wrPrt Data_out1,AddRTC
+   call Write
+   load Data_out1,0x43
+   wrPrt Data_out1,AddRTC
+   call Write 
+   ret	
+;-------------------------------------------------------------------------------------------
+;---------------------------------------CONTROL DE VGA--------------------------------------
+Control_VGA:
+	load s5,0x00
+	rdmem Dato_SP,(s5);lee el dato en 0x00 de SP Mem
+	wrPrt Dato_SP, Seg_R; escribe en el puerto de salida dato de seg de SP mem
+	add s5,0x01;0x01
+	rdmem Dato_SP,(s5)
+	wrPrt Dato_SP, Min_R;escribe en el puerto de salida dato de min de SP mem
+	add s5,0x01;0x02
+	rdmem Dato_SP,(s5)
+	wrPrt Dato_SP, Hor_R;escribe en el puerto de salida dato de min de SP mem
+	add s5,0x01;0x03
+	rdmem Dato_SP,(s5)
+	wrPrt Dato_SP, Dia_F;escribe en el puerto de salida dato de min de SP mem
+	add s5,0x01;0x04
+	rdmem Dato_SP,(s5)
+	wrPrt Dato_SP, Mes_F;escribe en el puerto de salida dato de min de SP mem
+	add s5,0x01;0x05
+	rdmem Dato_SP,(s5)
+	wrPrt Dato_SP, Year_F;escribe en el puerto de salida dato de min de SP mem
+	add s5,0x01;0x06
+	rdmem Dato_SP,(s5)
+	wrPrt Dato_SP, Seg_T;escribe en el puerto de salida dato de min de SP mem
+	add s5,0x01;0x07
+	rdmem Dato_SP,(s5)
+	wrPrt Dato_SP, Min_T;escribe en el puerto de salida dato de min de SP mem
+	add s5,0x01;0x08
+	rdmem Dato_SP,(s5)
+	wrPrt Dato_SP, Hor_T;escribe en el puerto de salida dato de min de SP mem
+	load s5,0x00;
+	ret
+	
+;-------------------------------------------------------------------------------------------
+
+Parametros:
+	
+	rdPrt Rst,Reset;lee puerto
+	comp Rst,0x2D
+	call NZ Reiniciar;salta a reiniciar todo
+	rdPrt Reloj,PR;lee puerto
+	comp Reloj,0x05
+	call NZ ProgReloj;salta a programar reloj
+	rdPrt Fecha, PF;lee puerto
+	comp Fecha, 0x06
+	call NZ ProgFecha;salta a programar fecha
+	rdPrt Timer,PT;lee puerto
+	comp Timer,0x04
+	call NZ ProgTimer;salta a programar timer
+	ret
+
+ProgReloj:
+	load s5,0x09
+	rdPrt Dato_In,DataProg ; leo dato del puerto, se almacena en registro Dato_in
+	wrmem Dato_In,(s5);se guarda el dato en memoria para luego ser enviado al RTC
+	wrPrt Dato_In,Seg_T;se saca el dato en pantalla
+	rdPrt Enter,OK; se pasa a minutos solo si 0K
+	comp Enter,0x5A
+	jump NZ ProgReloj ;si no hay enter se queda enciclado
+	add s5,0x01
+min:
+	rdPrt Dato_In,DataProg;
+	wrmem Dato_In,(s5)
+	wrPrt Dato_In,Min_T
+	rdPrt Enter,OK; se pasa a minutos solo si 0K
+	comp Enter,0x5A
+	jump NZ min ;si no hay enter se queda enciclado
+	add s5,0x01
+seg:
+	rdPrt Dato_In,DataProg;
+	wrmem Dato_In,(s5)
+	wrPrt Dato_In,Hor_T
+	rdPrt Enter,OK; se pasa a minutos solo si 0K
+	comp Enter,0x5A
+	jump NZ seg ;si no hay enter se queda enciclado
+    ret
+    
+
+	
+		
+	
