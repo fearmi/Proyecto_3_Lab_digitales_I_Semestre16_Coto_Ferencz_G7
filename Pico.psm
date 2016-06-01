@@ -5,26 +5,28 @@
 #equ DatoRTC,0x00 ;dato a RTC salida
 #equ AddRTC,0x01 ;Direccion a RTC salida
 #equ Dale,0x03;salida
-#equ Seg_R,0x04 ; salida segundos de hora
-#equ Min_R,0x05 ;salida minutos de hora
-#equ Hor_R,0x06 ; salida hora de hora
-#equ Dia_F,0x07 ;salida dia de fecha
-#equ Mes_F,0x08 ;salida mes de fecha
-#equ Year_F,0x09 ;salida año de fecha
-#equ Seg_T,0x0A ;salida segundos de cronometro
-#equ Min_T,0x0B ;salida minutos de cronometro
-#equ Hor_T,0x0C ;salida hora de cronometro
-#equ CM,0x0D
+#equ Seg_R,0x04 ; salida segundos de hora VGA
+#equ Min_R,0x05 ;salida minutos de hora VGA
+#equ Hor_R,0x06 ; salida hora de hora VGA
+#equ Dia_F,0x07 ;salida dia de fecha VGA
+#equ Mes_F,0x08 ;salida mes de fecha VGA
+#equ Year_F,0x09 ;salida año de fecha VGA
+#equ Seg_T,0x0A ;salida segundos de cronometro VGA
+#equ Min_T,0x0B ;salida minutos de cronometro VGA
+#equ Hor_T,0x0C ;salida hora de cronometro VGA
+#equ CM,0x0D;seleccion de mux y banco de registros BANCO DE REGISTROS
+#equ Var,0x0E ;selector de enables de programacion PS2
+;#equ Sel,0x0F;selectot de mux de programacion
 ;----------------------------------------------------------------------------------------------
 ;-------------------------------PUERTOS DE ENTRADA---------------------------------------------
 #equ Iniciar,0x02 ; señal de entrada para iniciar
-#equ In_Data, 0x04; entrada de dato
-#equ Reset,0x05; Reset de PS2
-#equ PR, 0x06 ; Programar parametros de reloj F1
-#equ PF,0x07;Progrmar parametros de fecha F2
-#equ PT,0x08;Programar parametros de timer F3
-#equ OK,0x09;Enter 
-#equ Dato_In,0x0A
+#equ In_Data, 0x04; entrada de dato DE LECTURA
+#equ PS2,0x05; INICIO EN PS2 d
+#equ Param, 0x03 ; PARAMETROS DE PROGRAMACION
+;#equ PF,0x07;Progrmar parametros de fecha F2
+;#equ PT,0x08;Programar parametros de timer F3
+;#equ OK,0x09;Enter 
+#equ Dato_In,0x01;Dato de entrada de programacion
 ;----------------------------------------------------------------------------------------------
 ;ahora, se definen registros temporales
 #equ Delay,s0 ; se define registro para crear retardos
@@ -34,39 +36,58 @@
 #equ Data_out3,s4;manejo de reset y perifericos
 #equ Dato_SP,s7 ;dato leido de Scratch Pad Mem
 #equ MP,s8 ; registro temporal de direcciones de registros de lectura
-#equ Rst,s9
-#equ Reloj,sA
-#equ Fecha,sB
-#equ Timer,sC
-#equ Enter,sD
-#equ DataProg,sE
+#equ Listo,s9
+#equ Reloj,sA;Reg temp para almacenar valor de reloj
+#equ Fecha,sB;Reg temp para almacenar valor de fecha
+#equ Timer,sC;Reg temp para almacernar valor de timer
+;#equ Enter,sD;Reg Temp para almacenar valor de timer
+#equ DataProg,sE;decenas
+#equ DataProg2,sD;unidades
 ;-----------------------------------------------------------------------------------------------
 ;------------------------------------LOADS INICIALES--------------------------------------------
 ;se carga cada uno de los registros temporales con valor 
 load Delay, 0x12 ; quiere decir 128 pulsos de 10 ns
-load Data_out1,0x00
-load Data_out2,0x00
-load Data_in,0x00
-load Data_out3,0x00
-load s5,0x00
+load Data_out1,0x00;Direccion de RTC
+load Data_out2,0x00;Dato de RTC
+load Data_in,0x00;dato de entrada
+load Data_out3,0x00;control de mux y perifericos de lectura escritura
+load s5,0x00;sPMem
 load Dato_SP,0x00
+;call SPMem
+;------------------------------------------------------------------------------------------------
+;----------------------------Registros de SPMem en 0x00------------------------------------------
+SPMem:
+	load s5,0x03
+	load Data_out2,0x01
+	wrmem Data_out2,(s5)
+	add s5,0x01
+	load Data_out2,0x06
+	wrmem Data_out2,(s5)
+	add s5,0x01
+	load Data_out2,0x16
+	wrmem Data_out2,(s5)	
+	load s5,0x00
 ;------------------------------------------------------------------------------------------------
 	
 inicio:
-	
 	rdPrt Data_in,Iniciar
 	comp Data_in,0x02
 	jump NZ, inicio
 	load Data_out3,0x38
     wrPrt Data_out3,Dale
+    load Data_out3,0x18
+	wrPrt Data_out3,Dale
 	call Inicializacion
 	call start
 	
 start:
 	call Leer
 	call Control_VGA
+	call Parametros
 	rdPrt Data_in,Iniciar
 	comp Data_in,0x02
+	wrPrt 0x01,Var
+	wrPrt 0x00,Var
 	jump NZ, inicio
 	jump start 
 ;funcion que permite generar seÃ±ales de salida basado en seÃ±ales de entrada.
@@ -196,41 +217,61 @@ RegInicia:
    load Data_out2,0x00
    call Write
    load Data_out1,0x00
-   load Data_out2,0x00
+   load Data_out2,0x08
    call Write 
    ret	
 ;---------------------------------------------------------------------------------------------
 ;-----------------------------PROGRAMAR PARAMETROS DE RELOJ----------------------------------
 RegClock:
+   load s5,0x00
    load Data_out1,0x21
+   rdmem Data_out2,(s5)
    call Write
+   add s5,0x01
    load Data_out1,0x22
+   rdmem Data_out2,(s5)
    call Write
+   add s5,0x01
    load Data_out1,0x23
-   call Write 
+   rdmem Data_out2,(s5)
+   call Write
    ret	
 ;--------------------------------------------------------------------------------------------
 ;---------------------------PROGRAMAR PARAMETROS DE FECHA-----------------------------------
 RegFecha:
+   load s5,0x03
    load Data_out1,0x24
+   rdmem Data_out2,(s5)
    call Write
+   add s5,0x01
    load Data_out1,0x25
+   rdmem Data_out2,(s5)
    call Write
+   add s5,0x01
    load Data_out1,0x26
+   rdmem Data_out2,(s5)
    call Write 
+   load s5,0x00
    ret	
 ;------------------------------------------------------------------------------------------
 ;-----------------------------------PROGRAMAR PARAMETROS DE TIMER--------------------------
 RegTimer:
+   load s5,0x06
    load Data_out1,0x41
+   rdmem Data_out2,(s5)
    wrPrt Data_out1,AddRTC
    call Write
+   add s5,0x01
    load Data_out1,0x42
+   rdmem Data_out2,(s5)
    wrPrt Data_out1,AddRTC
    call Write
+   add s5,0x01
    load Data_out1,0x43
+   rdmem Data_out2,(s5)
    wrPrt Data_out1,AddRTC
    call Write 
+   load s5,0x00
    ret	
 ;-------------------------------------------------------------------------------------------
 ;---------------------------------------CONTROL DE VGA--------------------------------------
@@ -267,49 +308,91 @@ Control_VGA:
 	
 ;-------------------------------------------------------------------------------------------
 
-Parametros:
-	
-	rdPrt Rst,Reset;lee puerto
-	comp Rst,0x2D
-	call NZ Reiniciar;salta a reiniciar todo
-	rdPrt Reloj,PR;lee puerto
-	comp Reloj,0x05
-	call NZ ProgReloj;salta a programar reloj
-	rdPrt Fecha, PF;lee puerto
-	comp Fecha, 0x06
-	call NZ ProgFecha;salta a programar fecha
-	rdPrt Timer,PT;lee puerto
-	comp Timer,0x04
-	call NZ ProgTimer;salta a programar timer
+PSReady:
+	rdPrt Listo,PS2
+	comp Listo,0x01
+	jumP NZ PSReady
 	ret
 
-ProgReloj:
-	load s5,0x09
-	rdPrt Dato_In,DataProg ; leo dato del puerto, se almacena en registro Dato_in
-	wrmem Dato_In,(s5);se guarda el dato en memoria para luego ser enviado al RTC
-	wrPrt Dato_In,Seg_T;se saca el dato en pantalla
-	rdPrt Enter,OK; se pasa a minutos solo si 0K
-	comp Enter,0x5A
-	jump NZ ProgReloj ;si no hay enter se queda enciclado
-	add s5,0x01
-min:
-	rdPrt Dato_In,DataProg;
-	wrmem Dato_In,(s5)
-	wrPrt Dato_In,Min_T
-	rdPrt Enter,OK; se pasa a minutos solo si 0K
-	comp Enter,0x5A
-	jump NZ min ;si no hay enter se queda enciclado
-	add s5,0x01
-seg:
-	rdPrt Dato_In,DataProg;
-	wrmem Dato_In,(s5)
-	wrPrt Dato_In,Hor_T
-	rdPrt Enter,OK; se pasa a minutos solo si 0K
-	comp Enter,0x5A
-	jump NZ seg ;si no hay enter se queda enciclado
-    ret
-    
+;-------------------------------------------------------------------------------------------
+;-----------------------Lee Puerto y guarda dato de pS2, lo muestra en pantalla------------
+Read_Port:
+	call PSReady
+	rdPrt DataProg, Dato_In;lee el dato del puerto	
+	SL0 DataProg
+	SL0 DataProg
+	SL0 DataProg
+	SL0 DataProg
+	wrPrt 0x01,Var
+	wrPrt 0x00,Var	
+	call PSReady 
+	rdPrt DataProg2,Dato_In;lee el dato del puerto	
+	wrPrt 0x01,Var
+	wrPrt 0x00,Var	
+	add DataProg,DataProg2
+	wrmem DataProg,(s5);guarda el dato en memoria
+	wrPrt DataProg,(sF)		
+	add s5,0x01 
+	add sF,0x01
+	ret
 
-	
-		
-	
+;--------------------------------------------------------------------------------------------------
+;-----------------------Parametros para programar y leer puertos de datos a enviar----------------
+Parametros:	
+	rdPrt Reloj,Param;lee puerto
+	wrPrt 0x01,Var
+	wrPrt 0x00,Var
+	comp Reloj,0x05;F1
+	call Z ProgReloj;salta a programar reloj 
+	rdPrt Fecha, Param;lee puerto
+	wrPrt 0x01,Var
+	wrPrt 0x00,Var
+	comp Fecha, 0x06;F2
+	call Z ProgFecha;salta a programar fecha
+	rdPrt Timer,Param;lee puerto
+	wrPrt 0x01,Var
+	wrPrt 0x00,Var
+	comp Timer,0x04;F3
+	call Z ProgTimer;salta a programar timer
+	ret
+;--------------------------------------------------------------------------------------------------
+;---------------------------Programar registros de RTC en el espacio de Reloj----------------------	
+ProgReloj:
+	load sF,0x04
+	load s5,0x00
+	call Read_Port;segundos
+	call Read_Port;minutos
+	call Read_Port;horas
+	call RegClock
+	call Write
+	ret
+;--------------------------------------------------------------------------------------------------
+;---------------------------Programar registros de RTC en el espacio de Fecha----------------------
+ProgFecha:
+	load sF,0x07
+	load s5,0x03
+	call Read_Port;segundos
+	call Read_Port;minutos
+	call Read_Port;horas
+	call RegFecha
+	load Data_out1,0xF1
+	load Data_out2,0xF1
+	call Write
+	ret
+;--------------------------------------------------------------------------------------------------
+;---------------------------Programar registros de RTC en el espacio de Timer----------------------
+ProgTimer:
+	load sF,0x0A
+	load s5,0x06
+	call Read_Port;segundos
+	call Read_Port;minutos
+	call Read_Port;horas
+	call RegTimer
+	load Data_out1,0xF2
+	load Data_out2,0xF2
+	call Write
+	load Data_out1,0x00
+	load Data_out2,0x08
+	call Write
+	ret
+;--------------------------------------------------------------------------------------------------
