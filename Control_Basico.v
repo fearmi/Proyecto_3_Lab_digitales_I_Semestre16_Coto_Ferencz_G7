@@ -19,20 +19,21 @@
 //
 //////////////////////////////////////////////////////////////////////////////////
 module Control_Basico(
-    input Clk,
+    input Clk,ps2d,ps2c,
 	 input [7:0]Begin,
     inout [7:0] Data_Bus,
     output AD,CS,RD,WR,HSYNC,VSYNC,
 	 output [7:0]RGB
     );
+
 localparam B=8;
 reg [B-1:0] Dato,Direccion;
-reg [B-1:0]Inicie,CM;
+reg [B-1:0]Inicie,CM,TD,Listo;
 reg [B-1:0] SegR,MinR,HorR,DiaF,MesF,YearF,SegT,MinT,HorT;
-wire [B-1:0] datoleer,data_out;
+wire [B-1:0] datoleer,data_out,Dato_Reg,ps2_out,key_code,listo;
 wire WE;
+wire ADw,CSw,RDw,WRw,SAw,SDw,ADr,CSr,RDr,WRr,SAr,SDr,ADf,SDF,SAF;
 
-wire ADf,SDF,SAF;
 // declaración de señales de pico_blaze
 wire	[11:0]	address;
 wire	[17:0]	instruction;
@@ -78,7 +79,7 @@ assign interrupt = 1'b0;
 //es un punto v generado con archivo .psm y el ejecutable de emsamblador, ademaas de ROM_form.v
 
   Pico #(
-	.C_FAMILY		   ("S6"),   	//Family 'S6' or 'V6', serie 7 para nexys 4
+	.C_FAMILY		   ("7S"),   	//Family 'S6' or 'V6', serie 7 para nexys 4
 	.C_RAM_SIZE_KWORDS	(2),  	//Program size '1', '2' or '4' tamaño de RAM se puede cambiar segun especificaciones
 	.C_JTAG_LOADER_ENABLE	(1))  	//Include JTAG Loader when set to '1' 
   program_rom (    				//Name to match your PSM file
@@ -88,8 +89,24 @@ assign interrupt = 1'b0;
 	.instruction 	(instruction),
 	.clk 			(Clk));
 
-wire ADw,CSw,RDw,WRw,SAw,SDw;
-wire ADr,CSr,RDr,WRr,SAr,SDr;
+
+
+// Instantiate the module
+PS2 Teclado(
+    .clk(Clk), 
+    .reset(Inicie[7]), 
+    .var(TD), 
+    .ps2d(ps2d), 
+    .ps2c(ps2c), 
+    .key_code(key_code), 
+    .listo(listo)
+    );
+// Instantiate the module
+DecodeBCD Decodificador (
+    .ps2_in(key_code), 
+    .ps2_out(ps2_out)
+    );
+
 // Instantiate the module
 Escribir_Escribir Write_Write (
     .Reset(Inicie[3]), 
@@ -190,8 +207,11 @@ MainActivity VGA(
       case (port_id[2:0]) 
       
         // Read input_port_a at port address 00 hex
-        3'b010 : in_port <= Begin ;// coindice con el archivo psm
-        3'b100 : in_port <= data_out ;// coindice con el archivo psm
+		  3'b001 : in_port <= ps2_out; //Dato_In 
+        3'b010 : in_port <= Begin ;// INICIAR
+		  3'b011 : in_port <= ps2_out; //PARAM
+        3'b100 : in_port <= data_out ;// IN DATA
+		  3'b101 : in_port <= listo; //PS2
         default : in_port <= 8'bXXXXXXXX ;  
 
       endcase
@@ -205,11 +225,11 @@ MainActivity VGA(
       if (write_strobe == 1'b1) begin
 
         // Write to output_port_w at port address 00 hex
-        if (port_id[B-1:0] == 2'b00) begin // coindice con el archivo psm
+        if (port_id[B-1:0] == 8'h00) begin // coindice con el archivo psm
          Dato <= out_port;
         end
         // Write to output_port_w at port address 01 hex
-        if (port_id[B-1:0] == 2'b01) begin // coindice con el archivo psm
+        if (port_id[B-1:0] == 8'h01) begin // coindice con el archivo psm
          Direccion <= out_port;
         end
         // Write to output_port_w at port address 03 hex
@@ -256,6 +276,14 @@ MainActivity VGA(
         if (port_id[B-1:0] == 8'h0D) begin // coindice con el archivo psm
          CM <= out_port;
         end
+        // Write to output_port_w at port address 01 hex
+        if (port_id[B-1:0] == 8'h0E) begin // coindice con el archivo psm
+         TD <= out_port;
+        end
+        // Write to output_port_w at port address 01 hex
+        //if (port_id[B-1:0] == 8'h0F) begin // coindice con el archivo psm
+         //Sel <= out_port;
+        //end
   end
 end
 assign AD = ADf;
