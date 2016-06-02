@@ -38,11 +38,12 @@
 #equ MP,s8 ; registro temporal de direcciones de registros de lectura
 #equ Listo,s9
 #equ Reloj,sA;Reg temp para almacenar valor de reloj
-#equ Fecha,sB;Reg temp para almacenar valor de fecha
-#equ Timer,sC;Reg temp para almacernar valor de timer
+;#equ Fecha,sB;Reg temp para almacenar valor de fecha
+;#equ Timer,sC;Reg temp para almacernar valor de timer
 ;#equ Enter,sD;Reg Temp para almacenar valor de timer
 #equ DataProg,sE;decenas
 #equ DataProg2,sD;unidades
+#equ PC,sC
 ;-----------------------------------------------------------------------------------------------
 ;------------------------------------LOADS INICIALES--------------------------------------------
 ;se carga cada uno de los registros temporales con valor 
@@ -53,19 +54,36 @@ load Data_in,0x00;dato de entrada
 load Data_out3,0x00;control de mux y perifericos de lectura escritura
 load s5,0x00;sPMem
 load Dato_SP,0x00
+load PC,0x00
 ;call SPMem
 ;------------------------------------------------------------------------------------------------
 ;----------------------------Registros de SPMem en 0x00------------------------------------------
 SPMem:
-	load s5,0x03
+	load s5,0x00; segundos
+	load Data_out2,0x00
+	wrmem Data_out2,(s5)
+	add s5,0x01 ;01 minutos
+	load Data_out2,0x00
+	wrmem Data_out2,(s5)
+	add s5,0x01;02 hora
 	load Data_out2,0x01
 	wrmem Data_out2,(s5)
-	add s5,0x01
+	add s5,0x01 ; 03 dia
+	load Data_out2,0x01
+	wrmem Data_out2,(s5)
+	add s5,0x01; 04 mes
 	load Data_out2,0x06
 	wrmem Data_out2,(s5)
-	add s5,0x01
+	add s5,0x01;05 year
 	load Data_out2,0x16
-	wrmem Data_out2,(s5)	
+	wrmem Data_out2,(s5)
+	add s5,0x01;06 segundos crono
+	load Data_out2,0x00
+	wrmem Data_out2, (s5)
+	add s5,0x01 ; 07 minutos crono
+	wrmem Data_out2, (s5)
+	add s5,0x01 ;08 hora crono
+	wrmem Data_out2, (s5)	
 	load s5,0x00
 ;------------------------------------------------------------------------------------------------
 	
@@ -77,18 +95,19 @@ inicio:
     wrPrt Data_out3,Dale
     load Data_out3,0x18
 	wrPrt Data_out3,Dale
+	wrPrt PC,Var
 	call Inicializacion
 	call start
 	
 start:
 	call Leer
 	call Control_VGA
-	call Parametros
+	rdPrt Listo,PS2
+	comp Listo,0x01
+	Call Z Parametros
 	rdPrt Data_in,Iniciar
 	comp Data_in,0x02
-	wrPrt 0x01,Var
-	wrPrt 0x00,Var
-	jump NZ, inicio
+	jump NZ, SPMem
 	jump start 
 ;funcion que permite generar seÃ±ales de salida basado en seÃ±ales de entrada.
 Inicializacion:
@@ -214,10 +233,10 @@ RegInicia:
    load Data_out2,0xD2
    call Write
    load Data_out1,0x01
-   load Data_out2,0x00
+   load Data_out2,0x04
    call Write
    load Data_out1,0x00
-   load Data_out2,0x08
+   load Data_out2,0x00
    call Write 
    ret	
 ;---------------------------------------------------------------------------------------------
@@ -323,12 +342,16 @@ Read_Port:
 	SL0 DataProg
 	SL0 DataProg
 	SL0 DataProg
-	wrPrt 0x01,Var
-	wrPrt 0x00,Var	
+	load PC,0x01
+	wrPrt PC,Var
+	load PC,0x00
+	wrPrt PC,Var	
 	call PSReady 
 	rdPrt DataProg2,Dato_In;lee el dato del puerto	
-	wrPrt 0x01,Var
-	wrPrt 0x00,Var	
+	load PC,0x01
+	wrPrt PC,Var
+	load PC,0x00
+	wrPrt PC,Var	
 	add DataProg,DataProg2
 	wrmem DataProg,(s5);guarda el dato en memoria
 	wrPrt DataProg,(sF)		
@@ -340,31 +363,40 @@ Read_Port:
 ;-----------------------Parametros para programar y leer puertos de datos a enviar----------------
 Parametros:	
 	rdPrt Reloj,Param;lee puerto
-	wrPrt 0x01,Var
-	wrPrt 0x00,Var
+	load PC,0x01
+	wrPrt PC,Var
+	load PC,0x00
+	wrPrt PC,Var
 	comp Reloj,0x05;F1
 	call Z ProgReloj;salta a programar reloj 
-	rdPrt Fecha, Param;lee puerto
-	wrPrt 0x01,Var
-	wrPrt 0x00,Var
-	comp Fecha, 0x06;F2
+	comp Reloj, 0x06;F2
 	call Z ProgFecha;salta a programar fecha
-	rdPrt Timer,Param;lee puerto
-	wrPrt 0x01,Var
-	wrPrt 0x00,Var
-	comp Timer,0x04;F3
+	comp Reloj,0x04;F3
 	call Z ProgTimer;salta a programar timer
+	load Reloj,0x00
 	ret
 ;--------------------------------------------------------------------------------------------------
 ;---------------------------Programar registros de RTC en el espacio de Reloj----------------------	
 ProgReloj:
 	load sF,0x04
 	load s5,0x00
+	call PSReady
+	rdPrt DataProg, Dato_In;lee el dato del puerto
+	comp DataProg,0x1C
+	Call Z Hour12
+	load PC,0x01
+	wrPrt PC,Var
+	load PC,0x00
+	wrPrt PC,Var
 	call Read_Port;segundos
 	call Read_Port;minutos
 	call Read_Port;horas
 	call RegClock
+	load Data_out1,0xF1
+	load Data_out2,0xF1
 	call Write
+	load sF,0x00
+	load s5,0x00
 	ret
 ;--------------------------------------------------------------------------------------------------
 ;---------------------------Programar registros de RTC en el espacio de Fecha----------------------
@@ -378,12 +410,22 @@ ProgFecha:
 	load Data_out1,0xF1
 	load Data_out2,0xF1
 	call Write
+	load sF,0x00
+	load s5,0x00
 	ret
 ;--------------------------------------------------------------------------------------------------
 ;---------------------------Programar registros de RTC en el espacio de Timer----------------------
 ProgTimer:
 	load sF,0x0A
 	load s5,0x06
+	call PSReady
+	rdPrt DataProg, Dato_In;lee el dato del puerto
+	comp DataProg,0x2C
+	Call Z AlarmOff
+	load PC,0x01
+	wrPrt PC,Var
+	load PC,0x00
+	wrPrt PC,Var
 	call Read_Port;segundos
 	call Read_Port;minutos
 	call Read_Port;horas
@@ -394,5 +436,34 @@ ProgTimer:
 	load Data_out1,0x00
 	load Data_out2,0x08
 	call Write
+	load sF,0x00
+	load s5,0x00
 	ret
+
+AlarmOff:
+	
+	load Data_out1,0x01
+	load Data_out2,0x04
+	call Write
+	load Data_out1,0x41
+	load Data_out2,0x00
+	call Write
+	load Data_out1,0x42
+	load Data_out2,0x00
+	call Write
+	load Data_out1,0x43
+	load Data_out2,0x00
+	call Write
+	load Data_out1,0x00
+	load Data_out2,0x00
+	call Write
+	jump start
+Hour12:
+	load Data_out1,0x00
+	load Data_out2,0x10
+	call Write
+	ret
+
+	
+	
 ;--------------------------------------------------------------------------------------------------

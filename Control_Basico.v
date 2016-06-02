@@ -19,10 +19,10 @@
 //
 //////////////////////////////////////////////////////////////////////////////////
 module Control_Basico(
-    input Clk,ps2d,ps2c,
+    input Clk,ps2d,ps2c,irq,sw1,sw2,
 	 input [7:0]Begin,
     inout [7:0] Data_Bus,
-    output AD,CS,RD,WR,HSYNC,VSYNC,
+    output AD,CS,RD,WR,HSYNC,VSYNC,ampPWM,
 	 output [7:0]RGB
     );
 
@@ -100,6 +100,14 @@ PS2 Teclado(
     .ps2c(ps2c), 
     .key_code(key_code), 
     .listo(listo)
+    );
+// Instantiate the module
+sonido Alarma (
+    .clk(Clk), 
+    .hush(~irq), 
+    .sw1(sw1), 
+    .sw2(sw2), 
+    .ampPWM(ampPWM)
     );
 // Instantiate the module
 DecodeBCD Decodificador (
@@ -187,7 +195,8 @@ regfile Registros (
 MainActivity VGA(
     .rgb(RGB), 
     .clk_i(Clk), 
-    .reset_i(Inicie[5]), 
+    .reset_i(Inicie[5]),
+	 .IRQ(~irq),
     .R_Dia_Fecha(DiaF), 
     .R_Mes_Fecha(MesF), 
     .R_Ano_Fecha(YearF), 
