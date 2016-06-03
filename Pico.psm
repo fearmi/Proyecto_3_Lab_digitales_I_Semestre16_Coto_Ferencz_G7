@@ -37,13 +37,10 @@
 #equ Dato_SP,s7 ;dato leido de Scratch Pad Mem
 #equ MP,s8 ; registro temporal de direcciones de registros de lectura
 #equ Listo,s9
-#equ Reloj,sA;Reg temp para almacenar valor de reloj
-;#equ Fecha,sB;Reg temp para almacenar valor de fecha
-;#equ Timer,sC;Reg temp para almacernar valor de timer
-;#equ Enter,sD;Reg Temp para almacenar valor de timer
+#equ Reloj,sA;Reg temp para almacenar valor de parametros de PS2 para programar fecha,hora o crono
 #equ DataProg,sE;decenas
 #equ DataProg2,sD;unidades
-#equ PC,sC
+#equ PC,sC;registro para controlar la interfaz de PS2 y microcontrolador
 ;-----------------------------------------------------------------------------------------------
 ;------------------------------------LOADS INICIALES--------------------------------------------
 ;se carga cada uno de los registros temporales con valor 
@@ -58,7 +55,7 @@ load PC,0x00
 ;call SPMem
 ;------------------------------------------------------------------------------------------------
 ;----------------------------Registros de SPMem en 0x00------------------------------------------
-SPMem:
+SPMem:;esta rutina se encarga de guardar los valores inciales a programar en el RTC
 	load s5,0x00; segundos
 	load Data_out2,0x00
 	wrmem Data_out2,(s5)
@@ -99,7 +96,7 @@ inicio:
 	call Inicializacion
 	call start
 	
-start:
+start:;esta rutina se repite continuamente hasta iniciar no sea igual a 0x02 es reset
 	call Leer
 	call Control_VGA
 	rdPrt Listo,PS2
@@ -110,18 +107,18 @@ start:
 	jump NZ, SPMem
 	jump start 
 ;funcion que permite generar seÃ±ales de salida basado en seÃ±ales de entrada.
-Inicializacion:
-	call RegInicia
-    call RegClock
-    call RegFecha
-    call RegTimer
-    load Data_out1,0xF0
+Inicializacion:;rutina de inicialización
+	call RegInicia;llama a reg inicia para datos de inicializacion
+    call RegClock;llama a RegClock para programar parametros de reloj
+    call RegFecha;llama a RegFecha para programar parametros de fecha
+    call RegTimer;llama a RegTimer para programar parametros de timer
+    load Data_out1,0xF0 ;F0 para hacer transferencia de registros RTC a Area reservada
     load Data_out2,0xF0
-    call Write
+    call Write;escribe
 	ret	
 ;-----------------------------------------------------------------------------------------
 ;-----------------------------RETRASO-----------------------------------------------------	
-Retraso:        ;funcion para generar retrasos
+Retraso:        ;funcion para generar retrasos y se cumplan los tiempos de señaeles de control
    sub Delay,0x01
    jump NZ, Retraso
    load Delay, 0x12
@@ -133,8 +130,8 @@ Write:
    wrPrt Data_out2,DatoRTC;dato en puerto
    load Data_out3,0x11;carga dato para habilitar perifericos de escritura
    wrPrt Data_out3,Dale; habilita ciclo de envio de señales de control
-   load Data_out3,0x18
-   call Retraso
+   load Data_out3,0x18;carga dato para mantener y deshabilitar algunos perifericos de escritura
+   call Retraso;llama a retraso
    wrPrt Data_out3,Dale
    ret
 ;------------------------------------------------------------------------------------------
@@ -150,7 +147,7 @@ Read:
    ret
  ;------------------------------------------------------------------------------------------
  ;------------------------------LEER DATO DE REGISTRO---------------------------------------
-Read_Data:
+Read_Data:;lee dato de puerto y lo guarda en registro S6 para ser tranferido a SPmemory
    wrPrt MP,CM
    rdPrt s6,In_Data;lee puerto
    wrmem s6,(s5);guarda dato en scratchpad 
@@ -169,7 +166,10 @@ Read_Comand:
    ret
 ;--------------------------------------------------------------------------------------------
 ;----------------------------LEER------------------------------------------------------------
-Leer:
+; La rutina consta de hacer una transferencia de area reservada a registros de ram y enviar señales
+;de control que permitan hacer lecturas de los registros y almacenar su valor en SPmemory
+;--------------------------------------------------------------------------------------------
+Leer:;rutina para leer datos de rtc
 	load Data_out1, 0xF0;
 	load Data_out2, 0xF0;
 	call Read_Comand
@@ -229,14 +229,14 @@ RegInicia:
    load Data_out1,0x02;reg status 02
    load Data_out2,0x00;bit de ini bajo
    call Write
-   load Data_out1,0x10
+   load Data_out1,0x10;digital trimming value
    load Data_out2,0xD2
    call Write
-   load Data_out1,0x01
-   load Data_out2,0x04
+   load Data_out1,0x01;reg status 01
+   load Data_out2,0x04;Este dato para habilitar IRQ de timer
    call Write
-   load Data_out1,0x00
-   load Data_out2,0x00
+   load Data_out1,0x00;reg status 00
+   load Data_out2,0x00; formato 24 y timer desactivado
    call Write 
    ret	
 ;---------------------------------------------------------------------------------------------
@@ -326,7 +326,10 @@ Control_VGA:
 	ret
 	
 ;-------------------------------------------------------------------------------------------
-
+;--------------------------------------PSREADY----------------------------------------------
+; permite hacer un ciclo que este pendiente de la señal de PS2 que indica que hay un dato para 
+;leer
+;-------------------------------------------------------------------------------------------
 PSReady:
 	rdPrt Listo,PS2
 	comp Listo,0x01
@@ -403,11 +406,11 @@ ProgReloj:
 ProgFecha:
 	load sF,0x07
 	load s5,0x03
-	call Read_Port;segundos
-	call Read_Port;minutos
-	call Read_Port;horas
+	call Read_Port;dia
+	call Read_Port;mes
+	call Read_Port;año
 	call RegFecha
-	load Data_out1,0xF1
+	load Data_out1,0xF1;transferencia de datos de reg ram a area reservada
 	load Data_out2,0xF1
 	call Write
 	load sF,0x00
@@ -420,8 +423,8 @@ ProgTimer:
 	load s5,0x06
 	call PSReady
 	rdPrt DataProg, Dato_In;lee el dato del puerto
-	comp DataProg,0x2C
-	Call Z AlarmOff
+	comp DataProg,0x2C;si bandera en alto
+	Call Z AlarmOff;llama a desactivar alarma
 	load PC,0x01
 	wrPrt PC,Var
 	load PC,0x00
@@ -441,7 +444,9 @@ ProgTimer:
 	ret
 
 AlarmOff:
-	
+	load Data_out1,0x00
+	load Data_out2,0x00
+	call Write	
 	load Data_out1,0x01
 	load Data_out2,0x04
 	call Write
@@ -454,8 +459,8 @@ AlarmOff:
 	load Data_out1,0x43
 	load Data_out2,0x00
 	call Write
-	load Data_out1,0x00
-	load Data_out2,0x00
+	load Data_out1,0xF2
+	load Data_out2,0x0F2
 	call Write
 	jump start
 Hour12:
