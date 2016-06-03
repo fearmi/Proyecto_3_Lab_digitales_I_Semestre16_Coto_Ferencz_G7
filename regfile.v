@@ -21,8 +21,9 @@
 module regfile(input clock, input [3:0] address, input en_write, input [7:0] data_in, output [7:0] data_out);
 
 // Register file storage
-reg [7:0] registers[0:15];
-reg [7:0] out_val;
+localparam B=8;
+reg [B-1:0] registers[0:15];
+reg [B-1:0] out_val;
 
 // Read and write from register file
 always @(posedge clock ) begin

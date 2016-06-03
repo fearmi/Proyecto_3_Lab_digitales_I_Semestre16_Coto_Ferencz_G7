@@ -20,16 +20,18 @@
 //////////////////////////////////////////////////////////////////////////////////
 module MainActivity(
    output wire [7:0]  rgb,
-	input wire clk_i, reset_i,
+	input wire clk_i, reset_i,IRQ,
 	input wire [7:0] R_Dia_Fecha,R_Mes_Fecha,R_Ano_Fecha,R_Hora_Hora,R_Hora_Minutos,R_Hora_Segundos,R_Cronometro_Hora,R_Cronometro_Minutos,R_Cronometro_Segundo,
 	output wire hsync_o, vsync_o
 	);
 	reg clk1 = 0;		//need a downcounter to 25MHz
 	parameter Gimpy = 13'd6400;	//overall there are 6400 pixels
 	parameter GimpyXY = 7'd80;	//Gimp has 80x80 pixels
+	localparam B=8;
+	localparam C=10;
    // signal declaration
-  wire [9:0]pixel_x_o,pixel_y_o;
-  wire[7:0] text_rgb;
+  wire [C-1:0]pixel_x_o,pixel_y_o;
+  wire[B-1:0] text_rgb;
   wire Mux;
 //Divisor de frecuecnia.
 always @(posedge clk_i)begin     
@@ -68,10 +70,12 @@ ROM_masres instance_name (
 	parameter X1 = 10'd200-10'd25;//Posicion incial para la primer columna 
 	parameter X2 = 10'd280-10'd25;//posicion inicial para la segunda columna
 	parameter X3 = 10'd360-10'd25;//posicion inicial para la tercer columna
+	parameter X4 = 10'd440;//posicion inicial para la tercer columna
 	parameter Y = 9'd0;//posicion de la primera fila
 	parameter Y1 = 9'd160;//posicion de la segunda fila
 	parameter Y2 = 9'd320;//posicion de la tercer fila
-	wire [12:0] STATE1,STATE2,STATE3,STATE4,STATE5,STATE6,STATE7,STATE8;
+	wire [12:0] STATE1,STATE2,STATE3,STATE4,STATE5,STATE6,STATE7,STATE8,STATE;
+	reg [7:0] COLOUR_DATA [0:Gimpy-1];
 	reg [7:0] COLOUR_DATA1 [0:Gimpy-1];
 	reg [7:0] COLOUR_DATA2 [0:Gimpy-1];
 	reg [7:0] COLOUR_DATA3 [0:Gimpy-1];
@@ -82,8 +86,8 @@ ROM_masres instance_name (
 	reg [7:0] COLOUR_DATA8 [0:Gimpy-1];
 	reg [7:0] rg;// registro máscara de la salida de rgb
 
-	//initial
-	//$readmemh ("RTC.list", COLOUR_DATA);//Lee la imagen en hexadecimal
+	initial
+	$readmemh ("RTC.list", COLOUR_DATA);//Lee la imagen en hexadecimal
 	initial
 	$readmemh ("Dia.list", COLOUR_DATA1);//Lee la imagen en hexadecimal
 	initial
@@ -101,6 +105,7 @@ ROM_masres instance_name (
 	initial
 	$readmemh ("ins.list", COLOUR_DATA8);//Lee la imagen en hexadecimal
 	
+	assign STATE = (pixel_x_o-X4)*GimpyXY+pixel_y_o-Y2;//Dia
 	assign STATE1 = (pixel_x_o-X1)*GimpyXY+pixel_y_o-Y;//Dia
 	assign STATE2 = (pixel_x_o-X2)*GimpyXY+pixel_y_o-Y;//Mes
 	assign STATE3 = (pixel_x_o-X3)*GimpyXY+pixel_y_o-Y;//Ano
@@ -112,7 +117,7 @@ ROM_masres instance_name (
 //=======================================
 //numeros
 //=======================================
-  assign fecha =  (pixel_x_o>=192)&&(pixel_x_o<450)&&(pixel_y_o>=96)&&(pixel_y_o<128);
+  assign fecha =  (pixel_x_o>=192)&&(pixel_x_o<440)&&(pixel_y_o>=96)&&(pixel_y_o<128);
    assign row_addr_s = pixel_y_o[4:1];
    assign bit_addr_s = pixel_x_o[3:1];
    always @* 
@@ -136,7 +141,7 @@ ROM_masres instance_name (
          
       endcase
 //============================
-   assign hora = (pixel_x_o>=192)&&(pixel_x_o<450)&&(pixel_y_o>=256)&&(pixel_y_o<288);
+   assign hora = (pixel_x_o>=192)&&(pixel_x_o<440)&&(pixel_y_o>=256)&&(pixel_y_o<288);
 	assign row_addr_r = pixel_y_o[4:1];
    assign bit_addr_r = pixel_x_o[3:1];
 	
@@ -160,7 +165,7 @@ ROM_masres instance_name (
 			4'hf: char_addr_r = 7'h00; // 
  endcase
  //======================================
- assign crono =(pixel_x_o>=192)&&(pixel_x_o<450)&&(pixel_y_o>=416)&&(pixel_y_o<448);
+ assign crono =(pixel_x_o>=192)&&(pixel_x_o<440)&&(pixel_y_o>=416)&&(pixel_y_o<448);
 
    assign row_addr_g = pixel_y_o[4:1];
    assign bit_addr_g = pixel_x_o[3:1];
@@ -193,6 +198,7 @@ ROM_masres instance_name (
 		row_addr=4'b0000; 
 		bit_addr=3'b000;
       rg = 8'b00000000; 
+
 		if (pixel_x_o>=X1 && pixel_x_o<X1+GimpyXY//Dia
 			&& pixel_y_o>=Y && pixel_y_o<Y+GimpyXY)
 				rg = COLOUR_DATA1[{STATE1}];
@@ -242,6 +248,10 @@ ROM_masres instance_name (
             if (font_bit)
                rg = 8'b00000111;
          end
+		else if (IRQ)
+		if (pixel_x_o>=X4 && pixel_x_o<X4+GimpyXY//Dia
+			&& pixel_y_o>=Y2 && pixel_y_o<Y2+GimpyXY)
+				rg = COLOUR_DATA[{STATE}];
 		else
 				rg = 8'h1a;
 				

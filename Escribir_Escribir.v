@@ -30,8 +30,8 @@ module Escribir_Escribir(
     output   Sent_D1 //escribir dirección o dato
     );
 	 
-
-wire [6:0] t;
+localparam B=7;
+wire [B-1:0] t;
 
 reg A_D,CS,WR,RD,Sent_A,Sent_D,Fin;
 // Instantiate the module

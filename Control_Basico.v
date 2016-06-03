@@ -25,7 +25,7 @@ module Control_Basico(
     output AD,CS,RD,WR,HSYNC,VSYNC,ampPWM,
 	 output [7:0]RGB
     );
-
+//declaracion de wires y variables tipo reg
 localparam B=8;
 reg [B-1:0] Dato,Direccion;
 reg [B-1:0]Inicie,CM,TD,Listo;
@@ -50,8 +50,8 @@ wire		kcpsm6_sleep;         //See note above
 wire			kcpsm6_reset;         //See note above
 
 
-assign kcpsm6_sleep = 1'b0;
-assign interrupt = 1'b0;
+assign kcpsm6_sleep = 1'b0;//nivel bajo, no se utiliza 
+assign interrupt = 1'b0;//nivel bajo, no se utiliza interrupciones
 
 
 //instancia bloque de kcpsm6
@@ -91,32 +91,32 @@ assign interrupt = 1'b0;
 
 
 
-// Instantiate the module
+// Periferico teclado de PS2
 PS2 Teclado(
     .clk(Clk), 
     .reset(Inicie[7]), 
     .var(TD), 
     .ps2d(ps2d), 
     .ps2c(ps2c), 
-    .key_code(key_code), 
-    .listo(listo)
+    .key_code(key_code),//dato de salida de 8 bits. 
+    .listo(listo)//señal que indica que hay un dato para leer
     );
 // Instantiate the module
-sonido Alarma (
+sonido Alarma (// modulo de alarma
     .clk(Clk), 
-    .hush(~irq), 
-    .sw1(sw1), 
-    .sw2(sw2), 
+    .hush(~irq),//señal de interrupcion de entrada de RTC 
+    .sw1(sw1), //permite cambiar la frecuencia de la señal de salida
+    .sw2(sw2), //permite cambiar la frecuencoa de la señal de salida
     .ampPWM(ampPWM)
     );
 // Instantiate the module
-DecodeBCD Decodificador (
+DecodeBCD Decodificador ( // decodificador de tecla a BCD
     .ps2_in(key_code), 
     .ps2_out(ps2_out)
     );
 
 // Instantiate the module
-Escribir_Escribir Write_Write (
+Escribir_Escribir Write_Write ( // periférico que genera señales de control de escritura de RTC 
     .Reset(Inicie[3]), 
     .ciclo(Inicie[0]), 
     .Clock_in(Clk), 
@@ -129,7 +129,7 @@ Escribir_Escribir Write_Write (
     .Sent_D1(SDw)
     );
 // Instantiate the module
-Write_Read Escribe_Lee(
+Write_Read Escribe_Lee( //periférico que genera señales de control de lectura de RTC
     .Reset(Inicie[4]), 
     .ciclo(Inicie[1]), 
     .Fin1(Fin1), 
@@ -141,8 +141,8 @@ Write_Read Escribe_Lee(
     .Sent_A1(SAr), 
     .Sent_D1(SDr)
     );
-Mux_Sig_Control SignalOut (
-    .ADR(ADr), 
+Mux_Sig_Control SignalOut (//multiplexor que permite seleccionar entre señales de control de lectura y señales de
+    .ADR(ADr),             //control de escritura de RTC, además de las salidas para controlar el bus bidireccional
     .ADW(ADw), 
     .CSR(CSr), 
     .CSW(CSw), 
@@ -164,7 +164,7 @@ Mux_Sig_Control SignalOut (
     );
 
 // Instantiate the module
-Bus_Datos Bus_Bidireccional (
+Bus_Datos Bus_Bidireccional (//permite manejar la lectura y escritura de datos entre el micro-controlador y el RTC
     .clk(Clk), 
     .leerdato(SDF), 
     .escribirdato(SAF), 
@@ -176,14 +176,14 @@ Bus_Datos Bus_Bidireccional (
     );
 
 // Instantiate the module
-Mux_Write_Enable WriteEnable (
+Mux_Write_Enable WriteEnable ( // Multiplexor que permite controlar la lectura o escritura en el banco de registros
     .P(SDF), 
     .P1(CM[0]), 
     .Select(CM[1]), 
     .WE(WE)
     );
 // Instantiate the module
-regfile Registros (
+regfile Registros (//banco de registros
     .clock(Clk), 
     .address(CM[7:4]), 
     .en_write(WE), 
@@ -192,7 +192,7 @@ regfile Registros (
     );
 
 // Instantiate the module
-MainActivity VGA(
+MainActivity VGA(// controlador de VGA
     .rgb(RGB), 
     .clk_i(Clk), 
     .reset_i(Inicie[5]),
@@ -295,5 +295,5 @@ MainActivity VGA(
         //end
   end
 end
-assign AD = ADf;
-endmodule
+assign AD = ADf; //asigna señal de AD a la salida
+endmodule//fin del módulo

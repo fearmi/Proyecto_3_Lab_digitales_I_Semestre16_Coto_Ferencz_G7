@@ -30,8 +30,8 @@ module Write_Read(
     output   Sent_A1, //enviar  direccion
     output   Sent_D1 //leer dato
     );
-
-wire [6:0] t;
+localparam B=7;
+wire [B-1:0] t;
 reg reset_t;
 reg A_D,CS,WR,RD,Sent_A,Sent_D,Fin;
 // Instantiate the module
