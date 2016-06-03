@@ -30,18 +30,14 @@ module PS2
    );
 	
 	
-	//reg listo1;
-	//reg [7:0] key_code1;
-	//assign key_code =  key_code1;
-	//assign listo = listo1;
-   // constant declaration
+
    localparam BRK = 8'hf0; // break code
 
    // symbolic state declaration
    localparam
       wait_brk = 2'b00,
       get_code = 2'b01,
-		espere_code = 2'b10;
+		notready = 2'b10;
 
    // signal declaration
    reg [1:0] state_reg, state_next;
@@ -95,9 +91,9 @@ module PS2
               begin
                   got_code_tick =1'b1;
 						listo = 1'b1;
-                  state_next = espere_code;
+                  state_next = notready;
 					end
-		espere_code:
+		notready:
 	   if (var==8'h01)
 			  begin
 		         listo = 1'b0;
@@ -105,7 +101,7 @@ module PS2
 			  end
 		else begin
 				listo=8'h01;
-			  state_next = espere_code;
+			  state_next = notready;
     end
 	 endcase
    end	
